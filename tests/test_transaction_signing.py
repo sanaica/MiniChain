@@ -10,176 +10,175 @@ Covers:
   4. Replay protection — duplicate nonce is rejected by state validation.
 """
 
-import unittest
+import pytest
 from nacl.signing import SigningKey
 from nacl.encoding import HexEncoder
 
 from minichain import Transaction, State
 
 
-class TestTransactionSigning(unittest.TestCase):
+# ------------------------------------------------------------------
+# Fixtures
+# ------------------------------------------------------------------
 
-    def setUp(self):
-        """Create two wallets and a fresh state before each test."""
-        self.alice_sk = SigningKey.generate()
-        self.alice_pk = self.alice_sk.verify_key.encode(encoder=HexEncoder).decode()
-
-        self.bob_sk = SigningKey.generate()
-        self.bob_pk = self.bob_sk.verify_key.encode(encoder=HexEncoder).decode()
-
-        self.state = State()
-        # Fund Alice so state-level tests have a balance to work with
-        self.state.credit_mining_reward(self.alice_pk, 100)
-
-    # ------------------------------------------------------------------
-    # 1. Valid transaction
-    # ------------------------------------------------------------------
-
-    def test_valid_signature_verifies(self):
-        """A properly signed transaction must pass signature verification."""
-        tx = Transaction(self.alice_pk, self.bob_pk, 10, nonce=0)
-        tx.sign(self.alice_sk)
-
-        self.assertTrue(
-            tx.verify(),
-            "A correctly signed transaction should verify successfully.",
-        )
-
-    # ------------------------------------------------------------------
-    # 2. Modified transaction data
-    # ------------------------------------------------------------------
-
-    def test_tampered_amount_fails_verification(self):
-        """Changing `amount` after signing must invalidate the signature."""
-        tx = Transaction(self.alice_pk, self.bob_pk, 10, nonce=0)
-        tx.sign(self.alice_sk)
-
-        tx.amount = 9999  # tamper
-
-        self.assertFalse(
-            tx.verify(),
-            "A transaction with a tampered amount must not verify.",
-        )
-
-    def test_tampered_receiver_fails_verification(self):
-        """Changing `receiver` after signing must invalidate the signature."""
-        tx = Transaction(self.alice_pk, self.bob_pk, 10, nonce=0)
-        tx.sign(self.alice_sk)
-
-        # Replace receiver with a freshly generated key
-        attacker_sk = SigningKey.generate()
-        tx.receiver = attacker_sk.verify_key.encode(encoder=HexEncoder).decode()
-
-        self.assertFalse(
-            tx.verify(),
-            "A transaction with a tampered receiver must not verify.",
-        )
-
-    def test_tampered_nonce_fails_verification(self):
-        """Changing `nonce` after signing must invalidate the signature."""
-        tx = Transaction(self.alice_pk, self.bob_pk, 10, nonce=0)
-        tx.sign(self.alice_sk)
-
-        tx.nonce = 99  # tamper
-
-        self.assertFalse(
-            tx.verify(),
-            "A transaction with a tampered nonce must not verify.",
-        )
-
-    # ------------------------------------------------------------------
-    # 3. Invalid public key
-    # ------------------------------------------------------------------
-
-    def test_wrong_sender_key_fails_verification(self):
-        """
-        A transaction whose `sender` field does not match the signing key
-        should raise ValueError (enforced in Transaction.sign).
-        """
-        tx = Transaction(self.alice_pk, self.bob_pk, 10, nonce=0)
-
-        with self.assertRaises(ValueError, msg="Signing with a mismatched key must raise ValueError"):
-            tx.sign(self.bob_sk)  # Bob's key ≠ Alice's public key
-
-    def test_forged_sender_field_fails_verification(self):
-        """
-        Manually setting a different public key as `sender` after signing
-        must cause verify() to return False.
-        """
-        tx = Transaction(self.alice_pk, self.bob_pk, 10, nonce=0)
-        tx.sign(self.alice_sk)
-
-        # Swap sender to Bob's key after signing
-        tx.sender = self.bob_pk
-
-        self.assertFalse(
-            tx.verify(),
-            "A transaction with a forged sender field must not verify.",
-        )
-
-    def test_unsigned_transaction_fails_verification(self):
-        """A transaction that was never signed must fail verification."""
-        tx = Transaction(self.alice_pk, self.bob_pk, 10, nonce=0)
-        # No call to tx.sign()
-
-        self.assertFalse(
-            tx.verify(),
-            "An unsigned transaction must not verify.",
-        )
-
-    # ------------------------------------------------------------------
-    # 4. Replay protection (nonce enforcement in State)
-    # ------------------------------------------------------------------
-
-    def test_replay_attack_same_nonce_rejected(self):
-        """
-        Submitting the same transaction twice (same nonce) should succeed
-        the first time and fail the second time.
-        """
-        tx = Transaction(self.alice_pk, self.bob_pk, 10, nonce=0)
-        tx.sign(self.alice_sk)
-
-        first = self.state.apply_transaction(tx)
-        self.assertTrue(first, "First submission must succeed.")
-
-        second = self.state.apply_transaction(tx)
-        self.assertFalse(second, "Replaying the same transaction must be rejected.")
-
-    def test_out_of_order_nonce_rejected(self):
-        """
-        Submitting a transaction with nonce=5 when the account nonce is 0
-        (i.e., skipping nonces) must be rejected.
-        """
-        tx = Transaction(self.alice_pk, self.bob_pk, 10, nonce=5)
-        tx.sign(self.alice_sk)
-
-        result = self.state.apply_transaction(tx)
-        self.assertFalse(result, "A transaction with a skipped nonce must be rejected.")
-
-    def test_sequential_nonces_accepted(self):
-        """
-        Sending two transactions with consecutive nonces (0 then 1)
-        must both succeed and update the balance correctly.
-        """
-        tx0 = Transaction(self.alice_pk, self.bob_pk, 10, nonce=0)
-        tx0.sign(self.alice_sk)
-        self.assertTrue(self.state.apply_transaction(tx0))
-
-        tx1 = Transaction(self.alice_pk, self.bob_pk, 10, nonce=1)
-        tx1.sign(self.alice_sk)
-        self.assertTrue(self.state.apply_transaction(tx1))
-
-        self.assertEqual(
-            self.state.get_account(self.alice_pk)["balance"],
-            80,
-            "Alice's balance should be 80 after two 10-coin transfers.",
-        )
-        self.assertEqual(
-            self.state.get_account(self.bob_pk)["balance"],
-            20,
-            "Bob's balance should be 20 after receiving two transfers.",
-        )
+@pytest.fixture
+def alice():
+    sk = SigningKey.generate()
+    pk = sk.verify_key.encode(encoder=HexEncoder).decode()
+    return sk, pk
 
 
-if __name__ == "__main__":
-    unittest.main()
+@pytest.fixture
+def bob():
+    sk = SigningKey.generate()
+    pk = sk.verify_key.encode(encoder=HexEncoder).decode()
+    return sk, pk
+
+
+@pytest.fixture
+def funded_state(alice):
+    _, alice_pk = alice
+    state = State()
+    state.credit_mining_reward(alice_pk, 100)
+    return state
+
+
+# ------------------------------------------------------------------
+# 1. Valid transaction
+# ------------------------------------------------------------------
+
+def test_valid_signature_verifies(alice, bob):
+    """A properly signed transaction must pass signature verification."""
+    alice_sk, alice_pk = alice
+    _, bob_pk = bob
+
+    tx = Transaction(alice_pk, bob_pk, 10, nonce=0)
+    tx.sign(alice_sk)
+
+    assert tx.verify(), "A correctly signed transaction should verify successfully."
+
+
+# ------------------------------------------------------------------
+# 2. Modified transaction data
+# ------------------------------------------------------------------
+
+def test_tampered_amount_fails_verification(alice, bob):
+    """Changing `amount` after signing must invalidate the signature."""
+    alice_sk, alice_pk = alice
+    _, bob_pk = bob
+
+    tx = Transaction(alice_pk, bob_pk, 10, nonce=0)
+    tx.sign(alice_sk)
+    tx.amount = 9999  # tamper
+
+    assert not tx.verify(), "A transaction with a tampered amount must not verify."
+
+
+def test_tampered_receiver_fails_verification(alice, bob):
+    """Changing `receiver` after signing must invalidate the signature."""
+    alice_sk, alice_pk = alice
+    _, bob_pk = bob
+
+    tx = Transaction(alice_pk, bob_pk, 10, nonce=0)
+    tx.sign(alice_sk)
+
+    attacker_sk = SigningKey.generate()
+    tx.receiver = attacker_sk.verify_key.encode(encoder=HexEncoder).decode()  # tamper
+
+    assert not tx.verify(), "A transaction with a tampered receiver must not verify."
+
+
+def test_tampered_nonce_fails_verification(alice, bob):
+    """Changing `nonce` after signing must invalidate the signature."""
+    alice_sk, alice_pk = alice
+    _, bob_pk = bob
+
+    tx = Transaction(alice_pk, bob_pk, 10, nonce=0)
+    tx.sign(alice_sk)
+    tx.nonce = 99  # tamper
+
+    assert not tx.verify(), "A transaction with a tampered nonce must not verify."
+
+
+# ------------------------------------------------------------------
+# 3. Invalid public key
+# ------------------------------------------------------------------
+
+def test_wrong_sender_key_raises(alice, bob):
+    """Signing with a key that doesn't match sender must raise ValueError."""
+    _, alice_pk = alice
+    bob_sk, bob_pk = bob
+
+    tx = Transaction(alice_pk, bob_pk, 10, nonce=0)
+
+    with pytest.raises(ValueError, match="Signing key does not match sender"):
+        tx.sign(bob_sk)
+
+
+def test_forged_sender_field_fails_verification(alice, bob):
+    """Manually swapping `sender` after signing must fail verification."""
+    alice_sk, alice_pk = alice
+    _, bob_pk = bob
+
+    tx = Transaction(alice_pk, bob_pk, 10, nonce=0)
+    tx.sign(alice_sk)
+    tx.sender = bob_pk  # forge sender
+
+    assert not tx.verify(), "A transaction with a forged sender field must not verify."
+
+
+def test_unsigned_transaction_fails_verification(alice, bob):
+    """A transaction that was never signed must fail verification."""
+    _, alice_pk = alice
+    _, bob_pk = bob
+
+    tx = Transaction(alice_pk, bob_pk, 10, nonce=0)
+    # No call to tx.sign()
+
+    assert not tx.verify(), "An unsigned transaction must not verify."
+
+
+# ------------------------------------------------------------------
+# 4. Replay protection
+# ------------------------------------------------------------------
+
+def test_replay_attack_same_nonce_rejected(alice, bob, funded_state):
+    """Replaying the same transaction must be rejected the second time."""
+    alice_sk, alice_pk = alice
+    _, bob_pk = bob
+
+    tx = Transaction(alice_pk, bob_pk, 10, nonce=0)
+    tx.sign(alice_sk)
+
+    assert funded_state.apply_transaction(tx), "First submission must succeed."
+    assert not funded_state.apply_transaction(tx), "Replayed transaction must be rejected."
+
+
+def test_out_of_order_nonce_rejected(alice, bob, funded_state):
+    """A transaction with a skipped nonce must be rejected."""
+    alice_sk, alice_pk = alice
+    _, bob_pk = bob
+
+    tx = Transaction(alice_pk, bob_pk, 10, nonce=5)
+    tx.sign(alice_sk)
+
+    assert not funded_state.apply_transaction(tx), "A transaction with a skipped nonce must be rejected."
+
+
+def test_sequential_nonces_accepted(alice, bob, funded_state):
+    """Two transactions with consecutive nonces must both succeed."""
+    alice_sk, alice_pk = alice
+    _, bob_pk = bob
+
+    tx0 = Transaction(alice_pk, bob_pk, 10, nonce=0)
+    tx0.sign(alice_sk)
+    assert funded_state.apply_transaction(tx0)
+
+    tx1 = Transaction(alice_pk, bob_pk, 10, nonce=1)
+    tx1.sign(alice_sk)
+    assert funded_state.apply_transaction(tx1)
+
+    assert funded_state.get_account(alice_pk)["balance"] == 80, \
+        "Alice's balance should be 80 after two 10-coin transfers."
+    assert funded_state.get_account(bob_pk)["balance"] == 20, \
+        "Bob's balance should be 20 after receiving two transfers."
