@@ -49,7 +49,7 @@ def create_wallet():
 
 def mine_and_process_block(chain, mempool, miner_pk):
     """Mine pending transactions into a new block."""
-    pending_txs = mempool.get_transactions_for_block()
+    pending_txs = mempool.get_transactions_for_block(chain.state)
     if not pending_txs:
         logger.info("Mempool is empty — nothing to mine.")
         return None
@@ -118,8 +118,8 @@ def make_network_handler(chain, mempool):
                 miner = payload.get("miner", BURN_ADDRESS)
                 chain.state.credit_mining_reward(miner)
 
-                # Drain matching txs from mempool so they aren't re-mined
-                mempool.get_transactions_for_block()
+                # Drop only confirmed transactions so higher nonces can remain queued.
+                mempool.remove_transactions(block.transactions)
             else:
                 logger.warning("📥 Received Block #%s — rejected", block.index)
 
@@ -200,7 +200,7 @@ async def cli_loop(sk, pk, chain, mempool, network, nonce_counter):
         elif cmd == "mine":
             mined = mine_and_process_block(chain, mempool, pk)
             if mined:
-                await network.broadcast_block(mined)
+                await network.broadcast_block(mined, miner=pk)
                 # Sync local nonce from chain state
                 acc = chain.state.get_account(pk)
                 nonce_counter[0] = acc.get("nonce", 0)

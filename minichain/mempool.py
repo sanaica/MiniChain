@@ -1,30 +1,39 @@
-from .pow import calculate_hash
+from collections import defaultdict
 import logging
 import threading
 
 logger = logging.getLogger(__name__)
 
+
 class Mempool:
     def __init__(self, max_size=1000):
-        self._pending_txs = []
-        self._seen_tx_ids = set()  # Dedup tracking
+        self._pending_by_sender = defaultdict(dict)
+        self._seen_tx_ids = set()
         self._lock = threading.Lock()
         self.max_size = max_size
 
     def _get_tx_id(self, tx):
-        """
-        Compute a unique deterministic ID for a transaction.
-        Uses full serialized tx (payload + signature).
-        """
-        return calculate_hash(tx.to_dict())
+        return tx.tx_id
+
+    def _count_transactions_unlocked(self):
+        return sum(len(sender_queue) for sender_queue in self._pending_by_sender.values())
+
+    def _expected_nonce_for_sender(self, sender, state):
+        if state is not None:
+            return state.get_account(sender)["nonce"]
+
+        sender_queue = self._pending_by_sender.get(sender, {})
+        if not sender_queue:
+            return 0
+        return min(sender_queue)
 
     def add_transaction(self, tx):
         """
         Adds a transaction to the pool if:
         - Signature is valid
         - Transaction is not a duplicate
+        - Sender nonce is not already present in the pool
         """
-
         tx_id = self._get_tx_id(tx)
 
         if not tx.verify():
@@ -33,30 +42,61 @@ class Mempool:
 
         with self._lock:
             if tx_id in self._seen_tx_ids:
-                logger.warning(f"Mempool: Duplicate transaction rejected {tx_id}")
+                logger.warning("Mempool: Duplicate transaction rejected %s", tx_id)
                 return False
 
-            if len(self._pending_txs) >= self.max_size:
-                # Simple eviction: drop oldest or reject. Here we reject.
+            sender_queue = self._pending_by_sender[tx.sender]
+            if tx.nonce in sender_queue:
+                logger.warning(
+                    "Mempool: Duplicate sender nonce rejected sender=%s nonce=%s",
+                    tx.sender[:8],
+                    tx.nonce,
+                )
+                return False
+
+            if self._count_transactions_unlocked() >= self.max_size:
                 logger.warning("Mempool: Full, rejecting transaction")
                 return False
 
-            self._pending_txs.append(tx)
+            sender_queue[tx.nonce] = tx
             self._seen_tx_ids.add(tx_id)
-
             return True
 
-    def get_transactions_for_block(self):
+    def get_transactions_for_block(self, state=None):
         """
-        Returns pending transactions and clears the pool.
-        """
+        Returns ready transactions only.
 
+        Transactions for the same sender are included in nonce order starting
+        from the sender's current account nonce. Later nonces stay queued until
+        earlier ones are confirmed.
+        """
         with self._lock:
-            txs = self._pending_txs[:]
+            selected = []
 
-            # Clear both list and dedup set to stay in sync
-            self._pending_txs = []
-            confirmed_ids = {self._get_tx_id(tx) for tx in txs}
-            self._seen_tx_ids.difference_update(confirmed_ids)
+            for sender, sender_queue in self._pending_by_sender.items():
+                expected_nonce = self._expected_nonce_for_sender(sender, state)
+                while expected_nonce in sender_queue:
+                    selected.append(sender_queue[expected_nonce])
+                    expected_nonce += 1
 
-            return txs
+            selected.sort(key=lambda tx: (tx.timestamp, tx.sender, tx.nonce))
+            self._remove_transactions_unlocked(selected)
+            return selected
+
+    def remove_transactions(self, transactions):
+        with self._lock:
+            self._remove_transactions_unlocked(transactions)
+
+    def _remove_transactions_unlocked(self, transactions):
+        for tx in transactions:
+            tx_id = self._get_tx_id(tx)
+            sender_queue = self._pending_by_sender.get(tx.sender)
+            if sender_queue and tx.nonce in sender_queue:
+                del sender_queue[tx.nonce]
+                if not sender_queue:
+                    del self._pending_by_sender[tx.sender]
+            self._seen_tx_ids.discard(tx_id)
+
+    def __len__(self):
+        with self._lock:
+            return self._count_transactions_unlocked()
