@@ -10,6 +10,7 @@ import json
 import logging
 
 from .serialization import canonical_json_hash
+from .validators import is_valid_receiver
 
 logger = logging.getLogger(__name__)
 
@@ -132,6 +133,13 @@ class P2PNetwork:
         for field, expected_type in optional_fields.items():
             if not isinstance(payload.get(field), expected_type):
                 return False
+
+        if payload["amount"] <= 0:
+            return False
+
+        receiver = payload.get("receiver")
+        if receiver is not None and not is_valid_receiver(receiver):
+            return False
 
         return True
 
