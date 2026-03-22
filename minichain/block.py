@@ -2,7 +2,7 @@ import time
 import hashlib
 from typing import List, Optional
 from .transaction import Transaction
-from .serialization import canonical_json_hash
+from .serialization import canonical_json_hash, canonical_json_bytes
 
 def _sha256(data: str) -> str:
     return hashlib.sha256(data.encode()).hexdigest()
@@ -117,3 +117,8 @@ class Block:
         if "merkle_root" in payload:
             block.merkle_root = payload["merkle_root"]
         return block
+
+    @property
+    def canonical_payload(self) -> bytes:
+        """Returns the full block (header + body) as canonical bytes for networking."""
+        return canonical_json_bytes(self.to_dict())
