@@ -73,7 +73,6 @@ class Block:
             "timestamp": self.timestamp,
             "difficulty": self.difficulty,
             "nonce": self.nonce,
-            "miner": self.miner,
         }
 
     # -------------------------
@@ -90,11 +89,11 @@ class Block:
     # FULL BLOCK
     # -------------------------
     def to_dict(self):
-        return {
-            **self.to_header_dict(),
-            **self.to_body_dict(),
-            "hash": self.hash,
-        }
+        data = self.to_header_dict()
+        data["transactions"] = [tx.to_dict() for tx in self.transactions]
+        data["hash"] = self.hash
+        data["miner"] = self.miner
+        return data
 
     # -------------------------
     # HASH CALCULATION

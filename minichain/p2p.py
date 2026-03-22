@@ -303,7 +303,6 @@ class P2PNetwork:
 
     async def _broadcast_raw(self, payload: dict):
         """Send a JSON message to every connected peer."""
-        line = (json.dumps(payload) + "\n").encode()
         line = (canonical_json_dumps(payload) + "\n").encode()
         disconnected = []
         for reader, writer in self._peers:
@@ -333,12 +332,16 @@ class P2PNetwork:
         self._mark_seen("tx", payload["data"])
         await self._broadcast_raw(payload)
 
-    async def broadcast_block(self, block):
+    async def broadcast_block(self, block, miner=None):
         logger.info("Network: Broadcasting Block #%d", block.index)
+        
+        # Ensure the block object has the miner set if provided
+        if miner:
+            block.miner = miner
+
         payload = {
             "type": "block",
-            "data": json.loads(block.canonical_payload.decode('utf-8')),
-            "miner": block.miner
+            "data": json.loads(block.canonical_payload.decode('utf-8'))
         }
         self._mark_seen("block", payload["data"])
         await self._broadcast_raw(payload)
