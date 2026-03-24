@@ -14,9 +14,6 @@ class Mempool:
         self.max_size = max_size
         self.transactions_per_block = transactions_per_block
 
-    def _get_tx_id(self, tx):
-        return tx.tx_id
-
     def add_transaction(self, tx):
         """
         Adds a transaction to the pool if:
@@ -24,7 +21,7 @@ class Mempool:
         - Transaction is not a duplicate
         - Mempool is not full
         """
-        tx_id = self._get_tx_id(tx)
+        tx_id = tx.tx_id
 
         if not tx.verify():
             logger.warning("Mempool: Invalid signature rejected")
@@ -47,7 +44,7 @@ class Mempool:
 
             if replacement_index is not None:
                 old_tx = self._pending_txs[replacement_index]
-                self._seen_tx_ids.discard(self._get_tx_id(old_tx))
+                self._seen_tx_ids.discard(old_tx.tx_id)
                 self._pending_txs[replacement_index] = tx
             else:
                 self._pending_txs.append(tx)
@@ -67,17 +64,17 @@ class Mempool:
 
     def remove_transactions(self, transactions):
         with self._lock:
-            remove_ids = {self._get_tx_id(tx) for tx in transactions}
+            remove_ids = {tx.tx_id for tx in transactions}
             remove_sender_nonces = {(tx.sender, tx.nonce) for tx in transactions}
             if not remove_ids:
                 return
             self._pending_txs = [
                 tx
                 for tx in self._pending_txs
-                if self._get_tx_id(tx) not in remove_ids
+                if tx.tx_id not in remove_ids
                 and (tx.sender, tx.nonce) not in remove_sender_nonces
             ]
-            self._seen_tx_ids = {self._get_tx_id(tx) for tx in self._pending_txs}
+            self._seen_tx_ids = {tx.tx_id for tx in self._pending_txs}
 
     def __len__(self):
         with self._lock:
