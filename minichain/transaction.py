@@ -6,7 +6,7 @@ from .serialization import canonical_json_bytes, canonical_json_hash
 
 
 class Transaction:
-    _TX_FIELDS = {"sender", "receiver", "amount", "nonce", "data", "timestamp", "signature"}
+    _TX_FIELDS = frozenset({"sender", "receiver", "amount", "nonce", "data", "timestamp", "signature"})
 
     def __setattr__(self, name, value):
         super().__setattr__(name, value)
@@ -19,7 +19,7 @@ class Transaction:
         self.amount = amount
         self.nonce = nonce
         self.data = data
-        self.timestamp = timestamp if timestamp else round(time.time() * 1000)
+        self.timestamp = timestamp if timestamp is not None else round(time.time() * 1000)
         self.signature = signature
         self._cached_tx_id = None
 
