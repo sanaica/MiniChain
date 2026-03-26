@@ -60,6 +60,7 @@ class Transaction:
         try:
             VerifyKey(self.sender, encoder=HexEncoder).verify(
                 self.hash_payload, bytes.fromhex(self.signature))
-            return True
         except (BadSignatureError, CryptoError, ValueError, TypeError):
             return False
+        else:
+            return True
