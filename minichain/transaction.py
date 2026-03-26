@@ -6,22 +6,29 @@ from .serialization import canonical_json_bytes, canonical_json_hash
 
 
 class Transaction:
+    # 1. List the fields that, if changed, should break the cache
+    _TX_FIELDS = {"sender", "receiver", "amount", "nonce", "data", "timestamp", "signature"}
+
     def __init__(self, sender, receiver, amount, nonce, data=None, signature=None, timestamp=None):
-        self.sender = sender        # Public key (Hex str)
-        self.receiver = receiver    # Public key (Hex str) or None for Deploy
+        # We set these first
+        self.sender = sender
+        self.receiver = receiver
         self.amount = amount
         self.nonce = nonce
-        self.data = data            # Preserve None (do NOT normalize to "")
-        if timestamp is None:
-            self.timestamp = round(time.time() * 1000)  # New tx: seconds → ms
-        elif timestamp > 1e12:
-            self.timestamp = int(timestamp)              # Already in ms (from network)
-        else:
-            self.timestamp = round(timestamp * 1000)     # Seconds → ms
-        self.signature = signature  # Hex str
+        self.data = data
+        self.timestamp = timestamp if timestamp else round(time.time() * 1000)
+        self.signature = signature
         
-        # 1. Initialize the cache placeholder
+        # Initialize cache last
         self._cached_tx_id = None
+
+    # 2. The "Watcher" function
+    def __setattr__(self, name, value):
+        # Perform the actual assignment
+        super().__setattr__(name, value)
+        # If a core field was changed, and the cache exists, kill the cache
+        if name in self._TX_FIELDS and hasattr(self, "_cached_tx_id"):
+            super().__setattr__("_cached_tx_id", None)
 
     def to_dict(self):
         return {
@@ -63,21 +70,16 @@ class Transaction:
 
     @property
     def tx_id(self):
-        """Deterministic identifier for the signed transaction, cached for performance."""
-        # 2. Check the cache before re-calculating
         if self._cached_tx_id is None:
             self._cached_tx_id = canonical_json_hash(self.to_dict())
         return self._cached_tx_id
 
     def sign(self, signing_key: SigningKey):
-        # Validate that the signing key matches the sender
         if signing_key.verify_key.encode(encoder=HexEncoder).decode() != self.sender:
             raise ValueError("Signing key does not match sender")
         signed = signing_key.sign(self.hash_payload)
+        # Setting this now automatically clears the cache because of __setattr__!
         self.signature = signed.signature.hex()
-        
-        # 3. Invalidate the cache because the signature (and thus the tx_id) changed
-        self._cached_tx_id = None
 
     def verify(self):
         if not self.signature:
