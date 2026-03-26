@@ -19,6 +19,9 @@ class Transaction:
         else:
             self.timestamp = round(timestamp * 1000)     # Seconds → ms
         self.signature = signature  # Hex str
+        
+        # 1. Initialize the cache placeholder
+        self._cached_tx_id = None
 
     def to_dict(self):
         return {
@@ -60,8 +63,11 @@ class Transaction:
 
     @property
     def tx_id(self):
-        """Deterministic identifier for the signed transaction."""
-        return canonical_json_hash(self.to_dict())
+        """Deterministic identifier for the signed transaction, cached for performance."""
+        # 2. Check the cache before re-calculating
+        if self._cached_tx_id is None:
+            self._cached_tx_id = canonical_json_hash(self.to_dict())
+        return self._cached_tx_id
 
     def sign(self, signing_key: SigningKey):
         # Validate that the signing key matches the sender
@@ -69,6 +75,9 @@ class Transaction:
             raise ValueError("Signing key does not match sender")
         signed = signing_key.sign(self.hash_payload)
         self.signature = signed.signature.hex()
+        
+        # 3. Invalidate the cache because the signature (and thus the tx_id) changed
+        self._cached_tx_id = None
 
     def verify(self):
         if not self.signature:
@@ -80,8 +89,4 @@ class Transaction:
             return True
 
         except (BadSignatureError, CryptoError, ValueError, TypeError):
-            # Covers:
-            # - Invalid signature
-            # - Malformed public key hex
-            # - Invalid hex in signature
             return False
