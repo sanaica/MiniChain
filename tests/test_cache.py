@@ -37,12 +37,25 @@ def test_tx_caching_efficiency():
         assert mock_hash.call_count == 2
 
 def test_signed_tx_is_sealed():
-    """Verifies that a signed transaction cannot be modified (Sealing check)."""
+    """Verifies that a signed transaction clears cache, changes ID, and cannot be modified."""
     sk = SigningKey.generate()
     sender_hex = sk.verify_key.encode(encoder=HexEncoder).decode()
     tx = Transaction(sender=sender_hex, receiver="bob", amount=100, nonce=1)
     
+    # 1. Grab the ID before signing
+    unsigned_id = tx.tx_id
+    assert tx._cached_tx_id == unsigned_id
+    
+    # 2. Sign it
     tx.sign(sk)
     
+    # 3. Prove signing killed the old cache
+    assert tx._cached_tx_id is None
+    
+    # 4. Prove the new ID is totally different
+    signed_id = tx.tx_id
+    assert signed_id != unsigned_id
+    
+    # 5. Prove it's locked down (Sealed)
     with pytest.raises(AttributeError, match="Transaction is sealed"):
         tx.amount = 500
