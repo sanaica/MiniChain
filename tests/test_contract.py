@@ -1,4 +1,3 @@
-from unittest.mock import patch
 import unittest
 
 from minichain import State, Transaction
