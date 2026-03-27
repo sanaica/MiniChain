@@ -75,7 +75,7 @@ class ContractMachine:
                 args=(code, globals_for_exec, context, queue)
             )
             p.start()
-            p.join(timeout=15)          # ← Increased for GitHub Actions
+            p.join(timeout=120)          # ← Increased for GitHub Actions
 
             if p.is_alive():
                 p.kill()
