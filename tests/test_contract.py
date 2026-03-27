@@ -38,7 +38,7 @@ if msg['data'] == 'increment':
             self.assertTrue(success)
         except Exception as e:
             if "timed out" in str(e).lower():
-                print(f"⚠️ Skipping assertion: Contract timed out on slow CI runner.")
+                print("⚠️ Skipping assertion: Contract timed out on slow CI runner.")
             else:
                 raise e
 
