@@ -101,7 +101,7 @@ class ContractMachine:
                 args=(code, globals_for_exec, context, queue)
             )
             p.start()
-            p.join(timeout=2)  # 2 second timeout
+            p.join(timeout=5)   # ← changed from 2 to 5
 
             if p.is_alive():
                 p.kill()
