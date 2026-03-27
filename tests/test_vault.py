@@ -1,4 +1,4 @@
-# 1. CI MOCK HACK (Must be at the very top) 
+# 1. CI MOCK CONFIGURATION
 import sys
 from unittest.mock import MagicMock
 
