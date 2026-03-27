@@ -327,7 +327,7 @@ async def run_node(port: int, connect_to: str | None, fund: int, datadir: str | 
 
     network.set_on_peer_connected(on_peer_connected)
 
-    await network.start(host="0.0.0.0", port=port)
+    await network.start(host="127.0.0.1", port=port)
 
     # Fund this node's wallet so it can transact in the demo
     if fund > 0:
