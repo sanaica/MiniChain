@@ -132,7 +132,7 @@ class ContractMachine:
 
             return True
 
-        except Exception as e:
+        except Exception:
             logger.error("Contract Execution Failed", exc_info=True)
             return False
 

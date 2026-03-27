@@ -43,7 +43,7 @@ class P2PNetwork:
             raise ValueError("handler_callback must be callable")
         self._handler_callback = handler_callback
 
-    async def start(self, port: int = 9000):
+    async def start(self, host: str = "0.0.0.0", port: int = 9000):
         """Start listening for incoming peer connections on the given port."""
         self._port = port
         self._server = await asyncio.start_server(

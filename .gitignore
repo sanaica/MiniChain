@@ -332,3 +332,34 @@ __pycache__/
 *.so
 *bore.zip
 *bore_bin
+
+# ==========================================
+# MiniChain Vault Generated Artifacts & Secrets
+# ==========================================
+vault_state.json
+backtest_report.csv
+backtest_chart.png
+.env
+
+# ==========================================
+# Testing & Linting Cache
+# ==========================================
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# ==========================================
+# Virtual Environments
+# ==========================================
+venv/
+env/
+.venv/
+
+# ==========================================
+# OS & Editor Specific
+# ==========================================
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

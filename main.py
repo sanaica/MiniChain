@@ -20,13 +20,12 @@ import argparse
 import asyncio
 import logging
 import os
-import re
 import sys
 
 from nacl.signing import SigningKey
 from nacl.encoding import HexEncoder
 
-from minichain import Transaction, Blockchain, Block, State, Mempool, P2PNetwork, mine_block
+from minichain import Transaction, Blockchain, Block, Mempool, P2PNetwork, mine_block
 from minichain.validators import is_valid_receiver
 
 
@@ -328,7 +327,7 @@ async def run_node(port: int, connect_to: str | None, fund: int, datadir: str | 
 
     network.set_on_peer_connected(on_peer_connected)
 
-    await network.start(port=port, host=host)
+    await network.start(host="0.0.0.0", port=port)
 
     # Fund this node's wallet so it can transact in the demo
     if fund > 0:
