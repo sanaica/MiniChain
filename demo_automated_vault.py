@@ -332,9 +332,9 @@ async def auto_pilot_mode() -> None:
                         amount=1,
                         nonce=iteration,
                         data=f"VAULT_TRADE_{signal}_ETH_AT_{int(price)}"
-                    )
+                    )  # type: ignore
                     tx.sign(vault_key)
-                    canonical_payload = canonical_json_dumps(tx.to_dict())
+                    canonical_payload = canonical_json_dumps(tx.to_dict())  # type: ignore
 
                     # 2. UPDATE STATE FIRST (checks-effects-interactions pattern)
                     if signal == "BUY":
@@ -356,7 +356,7 @@ async def auto_pilot_mode() -> None:
                     logger.debug("Canonical Payload: %s", canonical_payload)
 
                     # 5. BROADCAST LAST (stub — summer GSoC deliverable)
-                    await broadcast_transaction(tx.to_dict())
+                    await broadcast_transaction(tx.to_dict())  # type: ignore
 
                 except Exception as e:
                     logger.error("Execution failure for %s: %s", signal, e, exc_info=True)
