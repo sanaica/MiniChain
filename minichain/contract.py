@@ -5,6 +5,7 @@ import ast
 import json # Moved to module-level import
 logger = logging.getLogger(__name__)
 
+TIMEOUT_SECONDS: float = 10.0
 def _safe_exec_worker(code, globals_dict, context_dict, result_queue):
     """
     Worker function to execute contract code in a separate process.

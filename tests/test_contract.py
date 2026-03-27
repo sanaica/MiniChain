@@ -1,5 +1,4 @@
 import unittest
-import pytest
 
 from minichain import State, Transaction
 from nacl.signing import SigningKey
@@ -14,7 +13,6 @@ class TestSmartContract(unittest.TestCase):
         self.pk = self.sk.verify_key.encode(encoder=HexEncoder).decode()
         self.state.credit_mining_reward(self.pk, 100)
 
-    @pytest.mark.skipif(True, reason="Skipping due to consistent GitHub Actions runner timeouts")
     def test_deploy_and_execute(self):
         """Happy path: deploy and increment counter."""
 
