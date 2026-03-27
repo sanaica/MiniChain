@@ -8,16 +8,15 @@ sys.modules['minichain.transaction'] = MagicMock()
 sys.modules['minichain.serialization'] = MagicMock()
 
 # 2. STANDARD LIBRARY & THIRD-PARTY IMPORTS
-import pytest
-from decimal import Decimal
-from unittest.mock import AsyncMock, patch
+import pytest  # noqa: E402
+from decimal import Decimal  # noqa: E402
+from unittest.mock import AsyncMock, patch  # noqa: E402
 
 # 3. PROJECT IMPORTS (The vault code)
-from demo_automated_vault import (
+from demo_automated_vault import (  # noqa: E402
     get_oracle_consensus,
     load_vault_state,
     save_vault_state,
-    CFG,
     CircuitBreaker,
     generate_backtest_report,
     load_config,
