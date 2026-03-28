@@ -93,7 +93,6 @@ class Block:
         data = self.to_header_dict()
         data["transactions"] = [tx.to_dict() for tx in self.transactions]
         data["hash"] = self.hash
-        data["miner"] = self.miner
         return data
 
     # -------------------------
@@ -119,6 +118,11 @@ class Block:
         block.nonce = payload.get("nonce", 0)
         block.hash = payload.get("hash")
         
+        # Verify the block hash
+        expected_hash = block.compute_hash()
+        if block.hash is not None and block.hash != expected_hash:
+            raise ValueError("block hash does not match header")
+
         # Recalculate and verify the Merkle root!
         if "merkle_root" in payload and payload["merkle_root"] != block.merkle_root:
             raise ValueError("merkle_root does not match transactions")

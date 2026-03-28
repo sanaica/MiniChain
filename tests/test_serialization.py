@@ -50,6 +50,35 @@ def test_block_serialization_determinism():
     
     print("✅ Success: Block serialization is cross-instance deterministic!\n")
 
+def test_block_from_dict_rejects_tampered_payload():
+    print("--- Testing Tamper Rejection ---")
+    tx = Transaction(sender="A", receiver="B", amount=10, nonce=5, timestamp=1000)
+    block = Block(
+        index=1, previous_hash="0"*64, transactions=[tx], 
+        difficulty=2, timestamp=999999, miner="a"*40
+    )
+    block.hash = block.compute_hash()
+
+    # Test tampered Merkle Root
+    bad_merkle = block.to_dict()
+    bad_merkle["merkle_root"] = "f" * 64
+    try:
+        Block.from_dict(bad_merkle)
+        assert False, "Expected ValueError for tampered merkle_root"
+    except ValueError:
+        pass
+
+    # Test tampered Hash
+    bad_hash = block.to_dict()
+    bad_hash["hash"] = "0" * 64
+    try:
+        Block.from_dict(bad_hash)
+        assert False, "Expected ValueError for tampered hash"
+    except ValueError:
+        pass
+    
+    print("✅ Success: Tampered payloads are rejected!\n")
+
 if __name__ == "__main__":
     # Removed try/except so that AssertionErrors 'bubble up' to the test runner
     test_raw_data_determinism()
