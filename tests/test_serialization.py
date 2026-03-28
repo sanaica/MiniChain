@@ -31,18 +31,14 @@ def test_transaction_id_stability():
 def test_block_serialization_determinism():
     print("--- Testing Block Serialization & Cross-Instance Determinism ---")
     # FIX: Use fixed timestamps for both transaction and block
-    tx = Transaction(sender="A", receiver="B", amount=10, nonce=5, timestamp=1000)
+    tx_params = {"sender": "A", "receiver": "B", "amount": 10, "nonce": 5, "timestamp": 1000}
     
-    block_params = {
-        "index": 1, 
-        "previous_hash": "0"*64, 
-        "transactions": [tx], 
-        "difficulty": 2, 
-        "timestamp": 999999
-    }
+    # Create two separate but identical transaction instances
+    tx1 = Transaction(**tx_params)
+    tx2 = Transaction(**tx_params)
     
-    block1 = Block(**block_params)
-    block2 = Block(**block_params)
+    block1 = Block(index=1, previous_hash="0"*64, transactions=[tx1], difficulty=2, timestamp=999999)
+    block2 = Block(index=1, previous_hash="0"*64, transactions=[tx2], difficulty=2, timestamp=999999)
 
     assert block1.canonical_payload == block2.canonical_payload, "Identical blocks must have identical payloads"
     assert block1.compute_hash() == block2.compute_hash(), "Identical blocks must have identical hashes"
