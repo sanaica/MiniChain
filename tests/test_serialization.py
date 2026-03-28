@@ -68,20 +68,28 @@ def test_block_from_dict_rejects_tampered_payload():
     except ValueError:
         pass
 
+    # Test tampered Merkle Root
+    bad_merkle = block.to_dict()
+    bad_merkle["merkle_root"] = "f" * 64
+    try:
+        Block.from_dict(bad_merkle)
+        raise AssertionError("Expected ValueError for tampered merkle_root") # <-- CHANGED
+    except ValueError:
+        pass
+
     # Test tampered Hash
     bad_hash = block.to_dict()
     bad_hash["hash"] = "0" * 64
     try:
         Block.from_dict(bad_hash)
-        assert False, "Expected ValueError for tampered hash"
+        raise AssertionError("Expected ValueError for tampered hash") # <-- CHANGED
     except ValueError:
         pass
-    
-    print("✅ Success: Tampered payloads are rejected!\n")
 
 if __name__ == "__main__":
     # Removed try/except so that AssertionErrors 'bubble up' to the test runner
     test_raw_data_determinism()
     test_transaction_id_stability()
     test_block_serialization_determinism()
+    test_block_from_dict_rejects_tampered_payload()  # <--- ADDED THIS LINE
     print("🚀 ALL CANONICAL TESTS PASSED!")

@@ -41,7 +41,7 @@ class Block:
         transactions: Optional[List[Transaction]] = None,
         timestamp: Optional[float] = None,
         difficulty: Optional[int] = None,
-        miner=None
+        miner: Optional[str] = None
     ):
         self.index = index
         self.previous_hash = previous_hash
