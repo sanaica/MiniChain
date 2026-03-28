@@ -91,7 +91,7 @@ class Block:
     # -------------------------
     def to_dict(self):
         data = self.to_header_dict()
-        data["transactions"] = [tx.to_dict() for tx in self.transactions]
+        data.update(self.to_body_dict()) # Reuses existing serialization logic
         data["hash"] = self.hash
         return data
 

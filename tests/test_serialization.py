@@ -59,21 +59,12 @@ def test_block_from_dict_rejects_tampered_payload():
     )
     block.hash = block.compute_hash()
 
-    # Test tampered Merkle Root
+    # Test tampered Merkle Root (only one instance needed)
     bad_merkle = block.to_dict()
     bad_merkle["merkle_root"] = "f" * 64
     try:
         Block.from_dict(bad_merkle)
-        assert False, "Expected ValueError for tampered merkle_root"
-    except ValueError:
-        pass
-
-    # Test tampered Merkle Root
-    bad_merkle = block.to_dict()
-    bad_merkle["merkle_root"] = "f" * 64
-    try:
-        Block.from_dict(bad_merkle)
-        raise AssertionError("Expected ValueError for tampered merkle_root") # <-- CHANGED
+        raise AssertionError("Expected ValueError for tampered merkle_root") # Robust error
     except ValueError:
         pass
 
@@ -82,9 +73,11 @@ def test_block_from_dict_rejects_tampered_payload():
     bad_hash["hash"] = "0" * 64
     try:
         Block.from_dict(bad_hash)
-        raise AssertionError("Expected ValueError for tampered hash") # <-- CHANGED
+        raise AssertionError("Expected ValueError for tampered hash")
     except ValueError:
         pass
+    
+    print("✅ Success: Tampered payloads are rejected!\n")
 
 if __name__ == "__main__":
     # Removed try/except so that AssertionErrors 'bubble up' to the test runner
