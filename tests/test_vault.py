@@ -67,19 +67,24 @@ async def test_circuit_breaker_halts():
     assert cb.should_halt(Decimal("1090")) is True
 
 def test_full_state_persistence_roundtrip(tmp_path, monkeypatch):
-    """Verify that state + price_history survives save/load exactly."""
+    """Verify that state + price_history + cycles_held survives save/load exactly."""
     
     # Use a temporary file for the test
     test_file = tmp_path / "vault_state.json"
     monkeypatch.setattr('demo_automated_vault.STATE_FILE', test_file)
     
     history = [Decimal('2500.50'), Decimal('2600.75')]
-    save_vault_state(True, Decimal('2500.50'), Decimal('100.25'), history)
+    
+    # ADDED: Passed '5' as the cycles_held argument
+    save_vault_state(True, Decimal('2500.50'), Decimal('100.25'), history, 5)
     
     loaded = load_vault_state()
     assert loaded['has_eth'] is True
     assert loaded['total_profit'] == Decimal('100.25')
     assert loaded['price_history'] == history
+    
+    # ADDED: Assert that cycles_held was saved and loaded correctly
+    assert loaded['cycles_held'] == 5
 
 def test_backtest_report_generates_csv():
     """Verify that backtest always produces a valid CSV file."""

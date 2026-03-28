@@ -61,6 +61,8 @@ class VaultConfig:
     poll_interval_live: int = 15
     circuit_max_deviation: Decimal = Decimal('0.05')
     circuit_cooldown: int = 300
+    stop_loss_threshold: Decimal = Decimal('0.97')
+    max_hold_cycles: int = 120
 
 def load_config() -> VaultConfig:
     """Professional CLI + .env config loader."""
@@ -77,6 +79,10 @@ def load_config() -> VaultConfig:
         sell_threshold_live=Decimal(os.getenv("SELL_THRESHOLD_LIVE", "1.0005")),
         circuit_max_deviation=Decimal(os.getenv("CIRCUIT_MAX_DEVIATION", "0.05")),
         circuit_cooldown=int(os.getenv("CIRCUIT_COOLDOWN", "300")),
+        stop_loss_threshold=Decimal(os.getenv("STOP_LOSS_THRESHOLD", "0.97")),
+        max_hold_cycles=int(os.getenv("MAX_HOLD_CYCLES", "120")), 
+        oracle_quorum=int(os.getenv("ORACLE_QUORUM", "3")),       
+        oracle_timeout=int(os.getenv("ORACLE_TIMEOUT", "5"))
     )
 
 CFG = load_config()
@@ -205,18 +211,20 @@ def load_vault_state() -> Dict[str, Any]:
                 'has_eth': bool(raw.get('has_eth', False)),
                 'last_buy_price': Decimal(str(raw.get('last_buy_price', '0'))),
                 'total_profit': Decimal(str(raw.get('total_profit', '0'))),
-                'price_history': [Decimal(str(p)) for p in raw.get('price_history', [])]
+                'price_history': [Decimal(str(p)) for p in raw.get('price_history', [])],
+                'cycles_held': int(raw.get('cycles_held', 0))
             }
         except Exception as e:
             logger.warning("Corrupt state file, starting fresh: %s", e)
     return {'has_eth': False, 'last_buy_price': Decimal('0'), 'total_profit': Decimal('0'), 'price_history': []}
 
-def save_vault_state(has_eth: bool, last_buy_price: Decimal, total_profit: Decimal, price_history: List[Decimal]) -> None:
+def save_vault_state(has_eth: bool, last_buy_price: Decimal, total_profit: Decimal, price_history: List[Decimal], cycles_held: int) -> None:
     state = {
         'has_eth': has_eth,
         'last_buy_price': str(last_buy_price),
         'total_profit': str(total_profit),
-        'price_history': [str(p) for p in price_history]
+        'price_history': [str(p) for p in price_history],
+        'cycles_held': int(cycles_held)
     }
     try:
         with open(STATE_FILE, 'w') as f:
@@ -249,6 +257,7 @@ async def auto_pilot_mode() -> None:
     has_eth: bool = saved['has_eth']
     last_buy_price: Decimal = saved['last_buy_price']
     total_profit: Decimal = saved['total_profit']
+    cycles_held: int = saved['cycles_held']
     
     # CRITICAL: Mock backtest ALWAYS starts with a clean price history.
     # Without this, live-mode prices from a previous run contaminate the
@@ -308,17 +317,33 @@ async def auto_pilot_mode() -> None:
                 # Same pattern: float->str->Decimal to avoid precision contamination.
                 short_momentum = price - Decimal(str(statistics.mean(window)))
 
-            # DYNAMIC RULE 1: Buy the Dip
+                # DYNAMIC RULE 1: Buy the Dip
                 if price < (recent_avg * buy_threshold) and short_momentum < 0 and not has_eth:
                     signal = "BUY"
                     pct = ((recent_avg - price) / recent_avg) * 100
                     logger.info("💡 Dip detected (%.3f%% below avg) + negative momentum → BUY!", float(pct))
 
-                # DYNAMIC RULE 2: Sell the Peak
+                # DYNAMIC RULE 2: Sell the Peak (WITH PROFIT GUARD)
                 elif price > (recent_avg * sell_threshold) and short_momentum > 0 and has_eth:
+                    if price > last_buy_price:  # explicit profitability guard
+                        signal = "SELL"
+                        pct = ((price - recent_avg) / recent_avg) * 100
+                        logger.info("💡 Peak detected (%.3f%% above avg) + positive momentum → SELL!", float(pct))
+                    else:
+                        logger.info("🛡️ Peak signal ignored — would sell at a loss")
+
+                # DYNAMIC RULE 3: Stop-Loss (PREVENT BAG-HOLDING)
+                if has_eth and price < (last_buy_price * CFG.stop_loss_threshold):
                     signal = "SELL"
-                    pct = ((price - recent_avg) / recent_avg) * 100
-                    logger.info("💡 Peak detected (%.3f%% above avg) + positive momentum → SELL!", float(pct))
+                    loss_pct = ((last_buy_price - price) / last_buy_price) * 100
+                    logger.warning("🛑 STOP-LOSS TRIGGERED — selling at %.2f%% loss to prevent further bleeding", float(loss_pct))
+
+                # DYNAMIC RULE 4: Time-Stop (Max Hold Cycles)
+                if has_eth:
+                    cycles_held += 1
+                    if cycles_held >= CFG.max_hold_cycles:
+                        signal = "SELL"
+                        logger.warning("⏱️ TIME-STOP TRIGGERED — forcing exit after %d cycles to free capital", cycles_held)    
 
             # 4. Execution (Native MiniChain Integration)
             if signal in ["BUY", "SELL"]:
@@ -340,6 +365,7 @@ async def auto_pilot_mode() -> None:
                     if signal == "BUY":
                         has_eth = True
                         last_buy_price = price
+                        cycles_held = 0
                     else:
                         has_eth = False
                         profit = price - last_buy_price
@@ -348,7 +374,7 @@ async def auto_pilot_mode() -> None:
                         logger.info("Total P&L: +$%.2f", float(total_profit))
 
                     # 3. PERSIST BEFORE BROADCAST
-                    save_vault_state(has_eth, last_buy_price, total_profit, price_history)
+                    save_vault_state(has_eth, last_buy_price, total_profit, price_history, cycles_held)
 
                     # 4. LOG CRYPTOGRAPHIC PROOF
                     logger.info("TX ID: %s", tx.tx_id)
@@ -376,7 +402,7 @@ async def auto_pilot_mode() -> None:
     except (asyncio.CancelledError, KeyboardInterrupt):
         logger.info("🛑 Auto-Pilot stopped by user. Saving final state...")
     finally:
-        save_vault_state(has_eth, last_buy_price, total_profit, price_history)
+        save_vault_state(has_eth, last_buy_price, total_profit, price_history, cycles_held)
         if CFG.mock_mode:
             generate_backtest_report(price_history, total_profit, has_eth)
         logger.info("✅ MiniChain Smart Vault shut down cleanly.")
