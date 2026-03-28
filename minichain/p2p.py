@@ -336,18 +336,19 @@ class P2PNetwork:
         self._mark_seen("tx", payload["data"])
         await self._broadcast_raw(payload)
 
-    async def broadcast_block(self, block, miner=None):
+    async def broadcast_block(self, block):
+        """Broadcast a block. The block MUST have its miner property set before calling."""
         logger.info("Network: Broadcasting Block #%d", block.index)
         
-        # Ensure the block object has the miner set if provided
-        if miner:
-            block.miner = miner
+        # Enforce that the block is fully populated before it enters the network layer
+        if getattr(block, "miner", None) is None:
+            raise ValueError("block.miner must be populated before broadcasting")
 
         payload = {
             "type": "block",
-            "data": json.loads(block.canonical_payload.decode('utf-8'))
+            "data": json.loads(block.canonical_payload.decode("utf-8"))
         }
-        
+
         self._mark_seen("block", payload["data"])
         await self._broadcast_raw(payload)
 
