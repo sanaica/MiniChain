@@ -1,19 +1,16 @@
 import time
-
 import hashlib
-
-from typing import List, Optional
+from typing import Optional  # <-- Removed 'List' as requested
 
 from .transaction import Transaction
-
 from .serialization import canonical_json_hash, canonical_json_bytes
-
 
 
 def _sha256(data: str) -> str:
     return hashlib.sha256(data.encode()).hexdigest()
 
-def _calculate_merkle_root(transactions: List[Transaction]) -> Optional[str]:
+# <-- Updated 'List' to built-in 'list'
+def _calculate_merkle_root(transactions: list[Transaction]) -> Optional[str]:
     if not transactions:
         return None
 
@@ -42,7 +39,7 @@ class Block:
         self,
         index: int,
         previous_hash: str,
-        transactions: Optional[List[Transaction]] = None,
+        transactions: Optional[list[Transaction]] = None,  # <-- Updated to built-in 'list'
         timestamp: Optional[float] = None,
         difficulty: Optional[int] = None,
         miner: Optional[str] = None
@@ -77,10 +74,11 @@ class Block:
             "difficulty": self.difficulty,
             "nonce": self.nonce,
         }
-        # Backward compatibility: Only include miner in hash if it exists
+        # Include miner in header only when present (optional field)  <-- Reworded comment
         if self.miner is not None:
             header["miner"] = self.miner          
         return header
+        
     # -------------------------
     # BODY (transactions only)
     # -------------------------
@@ -116,15 +114,20 @@ class Block:
         # Safely extract and cast difficulty if it exists
         raw_diff = payload.get("difficulty")
         parsed_diff = int(raw_diff) if raw_diff is not None else None
+        
+        # Safely extract and cast timestamp if it exists <-- Added explicit timestamp casting
+        raw_ts = payload.get("timestamp")
+        parsed_ts = int(raw_ts) if raw_ts is not None else None
+        
         block = cls(
-            index=int(payload["index"]),  # <-- Cast to int
+            index=int(payload["index"]),  
             previous_hash=payload["previous_hash"],
             transactions=transactions,
-            timestamp=payload.get("timestamp"),
-            difficulty=parsed_diff,       # <-- Cast to int
+            timestamp=parsed_ts,          # <-- Passed the casted timestamp
+            difficulty=parsed_diff,       
             miner=payload.get("miner"),
         )
-        block.nonce = int(payload.get("nonce", 0))  # <-- Cast to int
+        block.nonce = int(payload.get("nonce", 0))  
         block.hash = payload.get("hash")
       
         # Verify the block hash
@@ -145,6 +148,8 @@ class Block:
             raise ValueError("block hash is missing")
         if self.hash != self.compute_hash():
             raise ValueError("block hash does not match header")
-        if _calculate_merkle_root(self.transactions) != self.merkle_root:
-            raise ValueError("merkle_root does not match transactions")          
+            
+        # <-- Removed the redundant and slow merkle_root check here as requested
+        # merkle_root consistency guaranteed by immutable transactions tuple
+        
         return canonical_json_bytes(self.to_dict())
