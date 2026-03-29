@@ -57,7 +57,9 @@ class Block:
         self.nonce: int = 0
         self.hash: Optional[str] = None
 
-        # NEW: compute merkle root once
+        # TODO (GSoC 2026 Phase 1): Implement Merkle root memoization cache here.
+        # Currently recomputes O(n log n) hash tree on every access. 
+        # Will replace static attribute with @property lazy evaluation.
         self.merkle_root: Optional[str] = _calculate_merkle_root(self.transactions)
 
     # -------------------------
