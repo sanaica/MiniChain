@@ -10,6 +10,7 @@ import aiohttp
 import statistics
 import logging
 import json
+from abc import ABC, abstractmethod
 from pathlib import Path
 import pandas as pd
 from decimal import Decimal, getcontext
@@ -25,6 +26,7 @@ from minichain.serialization import canonical_json_dumps
 
 __version__ = "0.1.0-gsoc2026"
 __all__ = [
+    "IOracleProvider",
     "auto_pilot_mode",
     "VaultConfig",
     "CircuitBreaker",
@@ -45,6 +47,23 @@ logging.basicConfig(
     datefmt='%Y-%m-%d %H:%M:%S'
 )
 logger = logging.getLogger(__name__)
+
+# ==========================================
+# ARCHITECTURAL INTERFACES (GSoC 2026 Strategy)
+# ==========================================
+class IOracleProvider(ABC):
+    """
+    Abstract Base Class for all price providers. 
+    """
+    @abstractmethod
+    async def fetch_price(self) -> Decimal:
+        """Fetches the current ticker price, returning a strict Decimal."""
+        pass
+
+    @abstractmethod
+    async def is_healthy(self) -> bool:
+        """Checks if the exchange API is responsive within the timeout."""
+        pass
 
 @dataclass(frozen=True)
 class VaultConfig:
