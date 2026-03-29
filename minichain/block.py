@@ -1,6 +1,7 @@
 import time
 import hashlib
 from typing import Optional  # <-- Removed 'List' as requested
+from collections.abc import Sequence
 
 from .transaction import Transaction
 from .serialization import canonical_json_hash, canonical_json_bytes
@@ -9,8 +10,8 @@ from .serialization import canonical_json_hash, canonical_json_bytes
 def _sha256(data: str) -> str:
     return hashlib.sha256(data.encode()).hexdigest()
 
-# <-- Updated 'List' to built-in 'list'
-def _calculate_merkle_root(transactions: list[Transaction]) -> Optional[str]:
+# <-- Updated to Sequence to accept the frozen tuple
+def _calculate_merkle_root(transactions: Sequence[Transaction]) -> Optional[str]:
     if not transactions:
         return None
 
