@@ -422,8 +422,8 @@ async def auto_pilot_mode() -> None:
         logger.info("🛑 Auto-Pilot stopped by user. Saving final state...")
     finally:
         save_vault_state(has_eth, last_buy_price, total_profit, price_history, cycles_held)
-        if CFG.mock_mode:
-            generate_backtest_report(price_history, total_profit, has_eth)
+        
+        generate_backtest_report(price_history, total_profit, has_eth)
         logger.info("✅ MiniChain Smart Vault shut down cleanly.")
 
 def generate_backtest_report(price_history: List[Decimal], total_profit: Decimal, has_eth: bool) -> None:

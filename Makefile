@@ -19,7 +19,17 @@ run-live:
 plot:
 	python plot_backtest.py
 
+# ==================== CLEAN (Python-powered for Cross-Platform safety) ====================
+
+# Manual Windows Reset (Run this in PowerShell if 'make clean' isn't used):
+# Set-Content -Path vault_state.json -Value '{"has_eth": false, "last_buy_price": 0.0, "total_profit": 0.0, "cycles_held": 0}' -Encoding Ascii; Remove-Item backtest_report.csv, backtest_chart.png, *.pyc -Force -ErrorAction SilentlyContinue
+
 clean:
-	rm -f vault_state.json backtest_report.csv backtest_chart.png *.pyc
-	find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
-	find . -type d -name .pytest_cache -exec rm -rf {} + 2>/dev/null || true
+	@echo "Cleaning up project files..."
+	@python -c "import os, glob, json; \
+		data = {'has_eth': False, 'last_buy_price': 0.0, 'total_profit': 0.0, 'cycles_held': 0}; \
+		open('vault_state.json', 'w').write(json.dumps(data)); \
+		[os.remove(f) for f in ['backtest_report.csv', 'backtest_chart.png'] if os.path.exists(f)]; \
+		[os.remove(f) for f in glob.glob('*.pyc')];"
+	@python -c "import shutil, os; \
+		[shutil.rmtree(p) for p in ['.pytest_cache', '__pycache__'] if os.path.exists(p)]" || true

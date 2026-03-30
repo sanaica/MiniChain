@@ -15,13 +15,17 @@ This prototype demonstrates a 3-of-5 median oracle consensus, momentum-based ana
 Clone the repository and install the required dependencies:
 
 ```bash
-git clone -b gsoc2026-smart-vault-prototype [https://github.com/sanaica/MiniChain.git](https://github.com/sanaica/MiniChain.git)
-cd minichain-vault
+git clone -b gsoc2026-smart-vault-prototype https://github.com/sanaica/MiniChain.git
+cd MiniChain
+```
 
 # Install dependencies
+```bash
 pip install -r requirements.txt -r requirements-dev.txt
+```
 
 # Alternatively, use the included Makefile:
+```bash
 make install
 ```
 
@@ -55,6 +59,16 @@ make run-live
 # Or run directly: python demo_automated_vault.py --live
 ```
 
+### 3. Visualizing Performance
+
+Once a run is complete and the backtest_report.csv is generated, you can visualize the price action and trade signals:
+
+```bash
+make plot
+#or python plot_backtest.py
+
+```
+
 ## Development & Testing
 
 **Run the Test Suite:**
@@ -69,6 +83,16 @@ make test
 ```bash
 make lint
 # Runs: ruff check . --fix && mypy --strict demo_automated_vault.py
+```
+
+### Maintenance & Reset
+
+To wipe old backtest reports, clear Python caches, and reset the vault state to a clean "holding cash" status:
+
+```bash
+make clean
+# Or If you don't have make installed on Windows, you can run the following in PowerShell:
+ Set-Content -Path vault_state.json -Value '{"has_eth": false, "last_buy_price": 0.0, "total_profit": 0.0, "cycles_held": 0}' -Encoding Ascii; Remove-Item backtest_report.csv, backtest_chart.png, *.pyc -Force -ErrorAction SilentlyContinue
 ```
 
 ## Configuration Reference (`.env`)
